@@ -1,16 +1,9 @@
-class Redis < Formula
+class RedisAT5 < Formula
   desc "Persistent key-value database, with built-in net interface"
   homepage "https://redis.io/"
   url "http://download.redis.io/releases/redis-5.0.9.tar.gz"
   sha256 "53d0ae164cd33536c3d4b720ae9a128ea6166ebf04ff1add3b85f1242090cb85"
-  head "https://github.com/antirez/redis.git", :branch => "unstable"
-
-#   bottle do
-#     cellar :any_skip_relocation
-#     sha256 "4d8c4759c1429c11f586bcf870f94f218d6352fd56ac5e4ee1d5dfadbc6e0304" => :catalina
-#     sha256 "4cad6cbf05beaab5549a12dc66650a4936f3e468ae421c8fcf9fd38ede66c793" => :mojave
-#     sha256 "ef9ac989dd55b0aae732ded463ae82e248795a77fd0f7d9021fd9c6f4fdbee73" => :high_sierra
-#   end
+  head "https://github.com/antirez/redis.git", branch: "unstable"
 
   def install
     # Architecture isn't detected correctly on 32bit Snow Leopard without help
@@ -24,14 +17,14 @@ class Redis < Formula
     inreplace "redis.conf" do |s|
       s.gsub! "/var/run/redis.pid", var/"run/redis.pid"
       s.gsub! "dir ./", "dir #{var}/db/redis/"
-      s.sub!  /^bind .*$/, "bind 127.0.0.1 ::1"
+      s.sub!(/^bind .*$/, "bind 127.0.0.1 ::1")
     end
 
     etc.install "redis.conf"
     etc.install "sentinel.conf" => "redis-sentinel.conf"
   end
 
-  plist_options :manual => "redis-server #{HOMEBREW_PREFIX}/etc/redis.conf"
+  plist_options manual: "redis-server #{HOMEBREW_PREFIX}/etc/redis.conf"
 
   def plist
     <<~EOS
@@ -50,7 +43,8 @@ class Redis < Formula
           <array>
             <string>#{opt_bin}/redis-server</string>
             <string>#{etc}/redis.conf</string>
-            <string>--daemonize no</string>
+            <string>--daemonize</string>
+            <string>no</string>
           </array>
           <key>RunAtLoad</key>
           <true/>
