@@ -1,0 +1,13 @@
+logs
+log
+.DS_Store
+Thumbs.db
+/.vscode
+/vendor
+/.settings
+/.buildpath
+node_modules/
+
+# Ignored PHPStorm files
+.idea/
+
