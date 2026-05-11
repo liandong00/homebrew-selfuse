@@ -4,7 +4,7 @@ class MysqlAT57 < Formula
   url "https://cdn.mysql.com/Downloads/MySQL-5.7/mysql-boost-5.7.44.tar.gz"
   sha256 "b8fe262c4679cb7bbc379a3f1addc723844db168628ce2acf78d33906849e491"
   license "GPL-2.0-only"
-  revision 3
+  revision 4
 
   bottle do
     sha256 arm64_sonoma:   "ca2e5c8b98bd92843578ffeae0e6280d3066afc33c814cb1ba49299fe9285f50"
@@ -60,6 +60,12 @@ class MysqlAT57 < Formula
 
     # Fixes loading of VERSION file; used in conjunction with patch
     File.rename "VERSION", "MYSQL_VERSION"
+
+    # CMake 4.x 兼容修复：GET_TARGET_PROPERTY 对非 target 调用时不再重置变量，
+    # 会让 MERGE_CONVENIENCE_LIBRARIES 把 .dylib 误判为未知静态库。每轮前手动重置。
+    inreplace "cmake/libutils.cmake",
+              "  FOREACH(LIB ${LIBS})\n    GET_TARGET_PROPERTY(LIB_TYPE ${LIB} TYPE)",
+              "  FOREACH(LIB ${LIBS})\n    SET(LIB_TYPE \"LIB_TYPE-NOTFOUND\")\n    GET_TARGET_PROPERTY(LIB_TYPE ${LIB} TYPE)"
 
     # -DINSTALL_* are relative to `CMAKE_INSTALL_PREFIX` (`prefix`)
     args = %W[
