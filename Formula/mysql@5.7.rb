@@ -4,7 +4,7 @@ class MysqlAT57 < Formula
   url "https://cdn.mysql.com/Downloads/MySQL-5.7/mysql-boost-5.7.44.tar.gz"
   sha256 "b8fe262c4679cb7bbc379a3f1addc723844db168628ce2acf78d33906849e491"
   license "GPL-2.0-only"
-  revision 5
+  revision 6
 
   bottle do
     sha256 arm64_sonoma:   "ca2e5c8b98bd92843578ffeae0e6280d3066afc33c814cb1ba49299fe9285f50"
@@ -119,11 +119,11 @@ class MysqlAT57 < Formula
     end
 
     # Remove the tests directory
-    rm_r(prefix/"mysql-test")
+    rm_r(prefix/"mysql-test") if (prefix/"mysql-test").exist?
 
     # Don't create databases inside of the prefix!
     # See: https://github.com/Homebrew/homebrew/issues/4975
-    rm_r(prefix/"data")
+    rm_r(prefix/"data") if (prefix/"data").exist?
 
     # Fix up the control script and link into bin.
     inreplace "#{prefix}/support-files/mysql.server",
