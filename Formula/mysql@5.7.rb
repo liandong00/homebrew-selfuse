@@ -4,7 +4,7 @@ class MysqlAT57 < Formula
   url "https://cdn.mysql.com/Downloads/MySQL-5.7/mysql-boost-5.7.44.tar.gz"
   sha256 "b8fe262c4679cb7bbc379a3f1addc723844db168628ce2acf78d33906849e491"
   license "GPL-2.0-only"
-  revision 4
+  revision 5
 
   bottle do
     sha256 arm64_sonoma:   "ca2e5c8b98bd92843578ffeae0e6280d3066afc33c814cb1ba49299fe9285f50"
@@ -61,11 +61,26 @@ class MysqlAT57 < Formula
     # Fixes loading of VERSION file; used in conjunction with patch
     File.rename "VERSION", "MYSQL_VERSION"
 
-    # CMake 4.x 兼容修复：GET_TARGET_PROPERTY 对非 target 调用时不再重置变量，
-    # 会让 MERGE_CONVENIENCE_LIBRARIES 把 .dylib 误判为未知静态库。每轮前手动重置。
+    # CMake 4.x 兼容修复 1：CMP0018/0022/0042/0045 这几个老策略在 CMake 4.x 被完全移除，
+    # 不再允许 SET ... OLD。直接注释掉这些设置，让 CMake 用 NEW 行为。
+    inreplace "CMakeLists.txt",
+              "CMAKE_POLICY(SET CMP0018 OLD)",
+              "# CMAKE_POLICY(SET CMP0018 OLD) [removed for CMake 4.x]"
+    inreplace "CMakeLists.txt",
+              "CMAKE_POLICY(SET CMP0022 OLD)",
+              "# CMAKE_POLICY(SET CMP0022 OLD) [removed for CMake 4.x]"
+    inreplace "CMakeLists.txt",
+              "CMAKE_POLICY(SET CMP0045 OLD)",
+              "# CMAKE_POLICY(SET CMP0045 OLD) [removed for CMake 4.x]"
+    inreplace "CMakeLists.txt",
+              "CMAKE_POLICY(SET CMP0042 OLD)",
+              "# CMAKE_POLICY(SET CMP0042 OLD) [removed for CMake 4.x]"
+
+    # CMake 4.x 兼容修复 2：CMP0045 NEW 行为下，GET_TARGET_PROPERTY 对非 target 直接报错。
+    # MySQL 5.7 的 libutils.cmake 依赖老行为（变量被设成 NOTFOUND），改成先用 IF(TARGET) 判断。
     inreplace "cmake/libutils.cmake",
               "  FOREACH(LIB ${LIBS})\n    GET_TARGET_PROPERTY(LIB_TYPE ${LIB} TYPE)",
-              "  FOREACH(LIB ${LIBS})\n    SET(LIB_TYPE \"LIB_TYPE-NOTFOUND\")\n    GET_TARGET_PROPERTY(LIB_TYPE ${LIB} TYPE)"
+              "  FOREACH(LIB ${LIBS})\n    IF(TARGET ${LIB})\n      GET_TARGET_PROPERTY(LIB_TYPE ${LIB} TYPE)\n    ELSE()\n      SET(LIB_TYPE \"LIB_TYPE-NOTFOUND\")\n    ENDIF()"
 
     # -DINSTALL_* are relative to `CMAKE_INSTALL_PREFIX` (`prefix`)
     args = %W[
