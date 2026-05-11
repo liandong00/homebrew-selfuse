@@ -4,7 +4,7 @@ class MysqlAT57 < Formula
   url "https://cdn.mysql.com/Downloads/MySQL-5.7/mysql-boost-5.7.44.tar.gz"
   sha256 "b8fe262c4679cb7bbc379a3f1addc723844db168628ce2acf78d33906849e491"
   license "GPL-2.0-only"
-  revision 1
+  revision 2
 
   bottle do
     sha256 arm64_sonoma:   "ca2e5c8b98bd92843578ffeae0e6280d3066afc33c814cb1ba49299fe9285f50"
@@ -49,6 +49,13 @@ class MysqlAT57 < Formula
       # against `_ZN17Gcs_debug_options12m_debug_noneB5cxx11E' can not be used when making
       # a shared object; recompile with -fPIC
       ENV.append_to_cflags "-fPIC"
+    end
+
+    if OS.mac?
+      # MySQL 5.7 在 macOS 上 socket listener 使用 select()，默认 FD_SETSIZE=1024，
+      # 长时间运行后 FD 编号超过 1024 会导致新连接无法建立（老连接仍可用）。
+      # 调大 __DARWIN_FD_SETSIZE 让 select() 能容纳更高编号的描述符。
+      ENV.append_to_cflags "-D__DARWIN_FD_SETSIZE=8192"
     end
 
     # Fixes loading of VERSION file; used in conjunction with patch
