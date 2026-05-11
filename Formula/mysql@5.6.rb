@@ -1,9 +1,11 @@
 class MysqlAT56 < Formula
   desc "Open source relational database management system"
   homepage "https://dev.mysql.com/doc/refman/5.6/en/"
-  url "https://dev.mysql.com/get/Downloads/MySQL-5.6/mysql-5.6.51.tar.gz"
+  # dev.mysql.com 的 5.6 下载已失效（403），换 cdn 归档地址
+  url "https://cdn.mysql.com/Downloads/MySQL-5.6/mysql-5.6.51.tar.gz"
   sha256 "262ccaf2930fca1f33787505dd125a7a04844f40d3421289a51974b5935d9abc"
   license "GPL-2.0-only"
+  revision 1
 
   bottle do
     rebuild 1
@@ -40,8 +42,24 @@ class MysqlAT56 < Formula
     # Fix loading of VERSION file; required in conjunction with patch
     File.rename "VERSION", "MYSQL_VERSION"
 
+    # CMake 4.x 兼容修复 1：这 6 个老策略在 CMake 4.x 已不再允许 SET ... OLD。
+    # 直接注释掉，让 CMake 用 NEW 行为。5.6 比 5.7 多 CMP0026 和 CMP0075。
+    %w[CMP0018 CMP0022 CMP0026 CMP0042 CMP0045 CMP0075].each do |policy|
+      inreplace "CMakeLists.txt",
+                "CMAKE_POLICY(SET #{policy} OLD)",
+                "# CMAKE_POLICY(SET #{policy} OLD) [removed for CMake 4.x]"
+    end
+
+    # CMake 4.x 兼容修复 2：CMP0045 NEW 行为下，GET_TARGET_PROPERTY 对非 target 直接报错。
+    # 5.6 的 libutils.cmake 在 MERGE_LIBRARIES 里对 LIBS_TO_MERGE 元素做了两次 GET_TARGET_PROPERTY，
+    # 用 IF(TARGET) 守卫一下，非 target 走 OSLIB 分支。
+    inreplace "cmake/libutils.cmake",
+              "  FOREACH(LIB ${LIBS_TO_MERGE})\n    GET_TARGET_PROPERTY(LIB_LOCATION ${LIB} LOCATION)\n    GET_TARGET_PROPERTY(LIB_TYPE ${LIB} TYPE)",
+              "  FOREACH(LIB ${LIBS_TO_MERGE})\n    IF(TARGET ${LIB})\n      GET_TARGET_PROPERTY(LIB_LOCATION ${LIB} LOCATION)\n      GET_TARGET_PROPERTY(LIB_TYPE ${LIB} TYPE)\n    ELSE()\n      SET(LIB_LOCATION \"LIB_LOCATION-NOTFOUND\")\n      SET(LIB_TYPE \"LIB_TYPE-NOTFOUND\")\n    ENDIF()"
+
     # -DINSTALL_* are relative to `CMAKE_INSTALL_PREFIX` (`prefix`)
     args = %W[
+      -DCMAKE_POLICY_VERSION_MINIMUM=3.5
       -DCOMPILATION_COMMENT=Homebrew
       -DDEFAULT_CHARSET=utf8
       -DDEFAULT_COLLATION=utf8_general_ci
