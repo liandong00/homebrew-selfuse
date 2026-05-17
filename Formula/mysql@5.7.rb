@@ -84,6 +84,25 @@ class MysqlAT57 < Formula
               "  FOREACH(LIB ${LIBS})\n    GET_TARGET_PROPERTY(LIB_TYPE ${LIB} TYPE)",
               "  FOREACH(LIB ${LIBS})\n    IF(TARGET ${LIB})\n      GET_TARGET_PROPERTY(LIB_TYPE ${LIB} TYPE)\n    ELSE()\n      SET(LIB_TYPE \"LIB_TYPE-NOTFOUND\")\n    ENDIF()"
 
+    # macOS 根治补丁：vio/viosocket.c 的 vio_io_wait（握手时等待 socket 可读/可写，
+    # 读 auth 包就走这里）被 `#if !defined(_WIN32) && !defined(__APPLE__)` 排除在
+    # poll() 实现之外，macOS 强制落到 select() 版。该版里有
+    # `#ifdef __APPLE__ if (fd >= FD_SETSIZE) DBUG_RETURN(-1); #endif`：
+    # 一旦 mysqld 打开的 fd 数被 table cache 撑高（DataGrip 内省全部库 /
+    # MCP 枚举全表），新连接 socket 拿到的 fd 号过大，vio_io_wait 直接返回错误，
+    # 握手被丢弃 —— server 端刷 "Got an error reading communication packets"、
+    # Aborted_connects 飙升，client 端报 "Lost connection at reading
+    # authorization packet"（与 FD_SETSIZE 大小无关，select() 这条路在 macOS 上
+    # 本身就有 fd 上限）。
+    # 修法：让 macOS 也走已存在的 poll() 版 vio_io_wait（poll 无 FD_SETSIZE 上限，
+    # MySQL 8.0 即如此），从根上拆掉这个天花板。viosocket.c 内该 #if 唯一，
+    # inreplace 找不到会让构建失败，可防版本漂移。
+    if OS.mac?
+      inreplace "vio/viosocket.c",
+                "#if !defined(_WIN32) && !defined(__APPLE__)",
+                "#if !defined(_WIN32) /* [macOS 根治: vio_io_wait 改走 poll(), 去掉 FD_SETSIZE 上限] */"
+    end
+
     # -DINSTALL_* are relative to `CMAKE_INSTALL_PREFIX` (`prefix`)
     args = %W[
       -DCMAKE_POLICY_VERSION_MINIMUM=3.5
