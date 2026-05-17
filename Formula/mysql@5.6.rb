@@ -57,6 +57,27 @@ class MysqlAT56 < Formula
               "  FOREACH(LIB ${LIBS_TO_MERGE})\n    GET_TARGET_PROPERTY(LIB_LOCATION ${LIB} LOCATION)\n    GET_TARGET_PROPERTY(LIB_TYPE ${LIB} TYPE)",
               "  FOREACH(LIB ${LIBS_TO_MERGE})\n    IF(TARGET ${LIB})\n      GET_TARGET_PROPERTY(LIB_LOCATION ${LIB} LOCATION)\n      GET_TARGET_PROPERTY(LIB_TYPE ${LIB} TYPE)\n    ELSE()\n      SET(LIB_LOCATION \"LIB_LOCATION-NOTFOUND\")\n      SET(LIB_TYPE \"LIB_TYPE-NOTFOUND\")\n    ENDIF()"
 
+    # macOS 根治补丁（与 mysql@5.7 同款）：vio/viosocket.c 的 vio_io_wait（握手等
+    # socket 可读以读 auth 包就走这里）被 `#if !defined(_WIN32) && !defined(__APPLE__)`
+    # 排除在 poll() 实现之外，macOS 强制落到 select() 版。5.6 的 select() 版连
+    # 5.7 那个 `if (fd >= FD_SETSIZE) DBUG_RETURN(-1)` 守卫都没有，且 5.6 formula
+    # 无 -DFD_SETSIZE（fd_set 按默认 __DARWIN_FD_SETSIZE=1024）：当 mysqld 打开的
+    # fd 被 table cache 撑高（DataGrip 内省全部库 / MCP 枚举全表），新连接 socket
+    # 的 fd 号 ≥1024 时，FD_SET/FD_ISSET 越界（现代 macOS SDK 经
+    # __darwin_check_fd_set_overflow 变静默 no-op）→ select 永远等不到就绪 →
+    # vio_io_wait 误判 → 握手被丢弃（server 刷 "Got an error reading
+    # communication packets"、Aborted_connects 飙升；client 报 "Lost connection
+    # at reading authorization packet"）。
+    # 修法：让 macOS 也走已存在的 poll() 版 vio_io_wait（poll 无 FD_SETSIZE 上限，
+    # MySQL 8.0 即如此），从根上拆掉这条 select() 路径。该 #if 在 viosocket.c 内
+    # 唯一，inreplace 找不到会让构建失败，可防版本漂移。5.6 listener 在
+    # sql/mysqld.cc 走 HAVE_POLL 的 poll()，无此问题，故只需这一处、不需 FD_SETSIZE。
+    if OS.mac?
+      inreplace "vio/viosocket.c",
+                "#if !defined(_WIN32) && !defined(__APPLE__)",
+                "#if !defined(_WIN32) /* [macOS 根治: vio_io_wait 改走 poll(), 去掉 FD_SETSIZE 上限] */"
+    end
+
     # -DINSTALL_* are relative to `CMAKE_INSTALL_PREFIX` (`prefix`)
     args = %W[
       -DCMAKE_POLICY_VERSION_MINIMUM=3.5
