@@ -37,7 +37,7 @@ class MysqlAT57 < Formula
   end
 
   def datadir
-    var/"mysql"
+    var/"mysql57"
   end
 
   # Fixes loading of VERSION file, backported from mysql/mysql-server@51675dd
@@ -151,20 +151,11 @@ class MysqlAT57 < Formula
               /^(PATH=".*)(")/,
               "\\1:#{HOMEBREW_PREFIX}/bin\\2"
     bin.install_symlink prefix/"support-files/mysql.server"
-
-    # Install my.cnf that binds to 127.0.0.1 by default
-    (buildpath/"my.cnf").write <<~EOS
-      # Default Homebrew MySQL server config
-      [mysqld]
-      # Only allow connections from localhost
-      bind-address = 127.0.0.1
-    EOS
-    etc.install "my.cnf"
   end
 
   def post_install
-    # Make sure the var/mysql directory exists
-    (var/"mysql").mkpath
+    # Make sure the version-specific data directory exists
+    datadir.mkpath
 
     # Don't initialize database, it clashes when testing other MySQL-like implementations.
     return if ENV["HOMEBREW_GITHUB_ACTIONS"]
@@ -177,29 +168,22 @@ class MysqlAT57 < Formula
   end
 
   def caveats
-    s = <<~EOS
+    <<~EOS
       We've installed your MySQL database without a root password. To secure it run:
           mysql_secure_installation
 
-      MySQL is configured to only allow connections from localhost by default
+      MySQL 5.7 uses this version-specific config:
+          #{etc}/mysql57.cnf
 
       To connect run:
-          mysql -uroot
+          mysql -S /tmp/mysql57.sock -uroot
     EOS
-    if (my_cnf = ["/etc/my.cnf", "/etc/mysql/my.cnf"].find { |x| File.exist? x })
-      s += <<~EOS
-
-        A "#{my_cnf}" from another install may interfere with a Homebrew-built
-        server starting up correctly.
-      EOS
-    end
-    s
   end
 
   service do
-    run [opt_bin/"mysqld_safe", "--datadir=#{var}/mysql"]
+    run [opt_bin/"mysqld_safe", "--defaults-file=#{etc}/mysql57.cnf"]
     keep_alive true
-    working_dir var/"mysql"
+    working_dir var/"mysql57"
   end
 
   test do
@@ -242,4 +226,3 @@ index 43d731e..3031258 100644
     IF(str)
       STRING(REPLACE "${keyword}=" "" str ${str})
       STRING(REGEX REPLACE  "[ ].*" ""  str "${str}")
-

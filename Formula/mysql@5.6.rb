@@ -26,7 +26,7 @@ class MysqlAT56 < Formula
   uses_from_macos "libedit"
 
   def datadir
-    var/"mysql"
+    var/"mysql56"
   end
 
   # Fixes loading of VERSION file, backported from mysql/mysql-server@51675dd
@@ -131,20 +131,11 @@ class MysqlAT56 < Formula
 
     libexec.install bin/"mysqlaccess"
     libexec.install bin/"mysqlaccess.conf"
-
-    # Install my.cnf that binds to 127.0.0.1 by default
-    (buildpath/"my.cnf").write <<~EOS
-      # Default Homebrew MySQL server config
-      [mysqld]
-      # Only allow connections from localhost
-      bind-address = 127.0.0.1
-    EOS
-    etc.install "my.cnf"
   end
 
   def post_install
-    # Make sure the var/mysql directory exists
-    (var/"mysql").mkpath
+    # Make sure the version-specific data directory exists
+    datadir.mkpath
 
     # Don't initialize database, it clashes when testing other MySQL-like implementations.
     return if ENV["HOMEBREW_GITHUB_ACTIONS"]
@@ -158,20 +149,18 @@ class MysqlAT56 < Formula
 
   def caveats
     <<~EOS
-      A "/etc/my.cnf" from another install may interfere with a Homebrew-built
-      server starting up correctly.
-
-      MySQL is configured to only allow connections from localhost by default
+      MySQL 5.6 uses this version-specific config:
+          #{etc}/mysql56.cnf
 
       To connect:
-          mysql -uroot
+          mysql -S /tmp/mysql56.sock -uroot
     EOS
   end
 
   service do
-    run [opt_bin/"mysqld_safe", "--datadir=#{var}/mysql"]
+    run [opt_bin/"mysqld_safe", "--defaults-file=#{etc}/mysql56.cnf"]
     keep_alive true
-    working_dir var/"mysql"
+    working_dir var/"mysql56"
   end
 
   test do
